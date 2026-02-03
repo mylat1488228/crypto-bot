@@ -2,7 +2,7 @@ import telebot
 from telebot import types
 import yfinance as yf
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg') # Обязательно для сервера
 import matplotlib.pyplot as plt
 import io
 import threading
@@ -14,8 +14,8 @@ import random
 from datetime import datetime
 
 # --- КОНФИГУРАЦИЯ ---
-BOT_TOKEN = '8212929038:AAFdctXociA1FcnaxKW7N0wbfc6SdFbJ1v0' 
-MAIN_ADMIN = 'SIavyanln' # Твой ник без @ (чувствителен к регистру!)
+BOT_TOKEN = '8212929038:AAFdctXociA1FcnaxKW7N0wbfc6SdFbJ1v0'
+MAIN_ADMIN = 'SIavyanln' 
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -97,29 +97,27 @@ def send_welcome(message):
     log_action(uid, message.from_user.username, "Запуск бота")
     
     if not data['tutorial_passed']:
-        # ОБУЧЕНИЕ НОВИЧКА ИИ-Ассистентом
         bot.send_message(uid, f"🤖 Привет, @{message.from_user.username}! Я твой финансовый ИИ-ассистент.")
         time.sleep(1)
-        bot.send_message(uid, "Давай я быстро покажу, что я умею:\n\n"
-                              "1. **Калькулятор** — Считает обмен с комиссией.\n"
-                              "2. **Тройной обмен** — Это для арбитража (например USDT->TON->KGS).\n"
-                              "3. **AI Помощник** — Это чат со мной. Спроси меня 'Что купить?', и я проанализирую рынок.\n"
-                              "4. **Список** — Добавь валюту, и я буду следить за ее ценой каждый час.")
-        time.sleep(2)
+        bot.send_message(uid, "Мои функции:\n"
+                              "1. **Калькулятор** — Комиссии и обмен.\n"
+                              "2. **Арбитраж** — Тройной обмен.\n"
+                              "3. **AI** — Советы по рынку.\n"
+                              "4. **Графики** — История цен.")
+        time.sleep(1)
         data['tutorial_passed'] = True
-        bot.send_message(uid, "Теперь ты готов! Начинаем?", reply_markup=main_menu())
+        bot.send_message(uid, "Начинаем!", reply_markup=main_menu())
     else:
         data['mode'] = 'menu'
-        bot.send_message(uid, "С возвращением! Я готов к работе.", reply_markup=main_menu())
+        bot.send_message(uid, "С возвращением!", reply_markup=main_menu())
 
 # =======================
-# КОНСОЛЬ АДМИНА (Исправленная)
+# АДМИН КОНСОЛЬ
 # =======================
 @bot.message_handler(commands=['admin'])
 def admin_panel(message):
     uid = message.chat.id
     uname = message.from_user.username
-    
     is_main = (uname == MAIN_ADMIN)
     is_mod = (uid in moderators)
 
@@ -144,7 +142,6 @@ def admin_actions(call):
     uid = call.message.chat.id
     uname = call.from_user.username
     action = call.data
-    
     is_main = (uname == MAIN_ADMIN)
     
     if action == "adm_logs_all":
@@ -154,7 +151,6 @@ def admin_actions(call):
         msg = bot.send_message(uid, "Введите @username:")
         bot.register_next_step_handler(msg, show_user_logs)
     
-    # Только для главного
     elif is_main:
         if action == "adm_ban":
             msg = bot.send_message(uid, "Введите @username для бана:")
@@ -170,7 +166,6 @@ def admin_actions(call):
     else:
         bot.answer_callback_query(call.id, "Нет прав.")
 
-# Логика админки
 def show_user_logs(message):
     t = message.text.replace('@', '')
     tid = username_map.get(t)
@@ -197,7 +192,7 @@ def del_mod(message):
     if tid in moderators: moderators.remove(tid); bot.send_message(message.chat.id, "Модер снят.")
 
 # =======================
-# РАЗГОВОРНЫЙ ИИ (CHAT MODE)
+# AI ЧАТ
 # =======================
 @bot.message_handler(func=lambda message: message.text == "💬 AI Помощник (Чат)")
 def ai_enter(message):
@@ -209,7 +204,7 @@ def ai_enter(message):
     markup.add("Что купить?", "Что продать?")
     markup.add("🔙 Главное меню")
     
-    bot.send_message(message.chat.id, "🤖 Режим чата активирован!\n\nТы можешь спросить:\n- *Что купить сейчас?*\n- *Как дела?*\n- *Какая погода?*\n- *Как работает бот?*\n\nИли просто пообщаться.", reply_markup=markup, parse_mode="Markdown")
+    bot.send_message(message.chat.id, "🤖 Чат активирован!\nСпрашивай:\n- Что купить?\n- Как дела?\n- Погода", reply_markup=markup)
 
 @bot.message_handler(func=lambda message: get_user_data(message).get('mode') == 'chat')
 def ai_conversation(message):
@@ -217,17 +212,13 @@ def ai_conversation(message):
     if uid in banned_users: return
     text = message.text.lower()
     
-    # ВЫХОД
     if message.text == "🔙 Главное меню":
         get_user_data(message)['mode'] = 'menu'
         bot.send_message(uid, "Выход в меню.", reply_markup=main_menu())
         return
 
-    # 1. ФИНАНСОВЫЙ СКАНЕР (УМНЫЙ)
-    if "купить" in text or "продать" in text or "вложить" in text or "выгодно" in text:
-        bot.send_message(uid, "🧐 Секунду, сканирую рынок (RSI индикаторы)...")
-        
-        # Реальный скан
+    if "купить" in text or "продать" in text or "выгодно" in text:
+        bot.send_message(uid, "🧐 Сканирую RSI...")
         best_buy, best_sell = None, None
         low_rsi, high_rsi = 100, 0
         
@@ -239,54 +230,26 @@ def ai_conversation(message):
                     u, d = delta.clip(lower=0), -1 * delta.clip(upper=0)
                     rs = u.ewm(com=13, adjust=False).mean() / d.ewm(com=13, adjust=False).mean()
                     rsi = 100 - (100 / (1 + rs)).iloc[-1]
-                    
                     if rsi < low_rsi: low_rsi, best_buy = rsi, name
                     if rsi > high_rsi: high_rsi, best_sell = rsi, name
             except: continue
         
         response = ""
-        # Логика ответов
-        if best_buy and low_rsi < 40:
-            response += f"🚀 **Брат, обрати внимание на {best_buy}.**\nRSI {low_rsi:.1f} (Перепродана). Хороший момент для входа.\n\n"
-        else:
-            response += "📉 Для покупки сейчас всё дороговато. Лучше подождать.\n\n"
-            
-        if best_sell and high_rsi > 60:
-            response += f"💰 **Если держишь {best_sell}, можно фиксировать прибыль.**\nRSI {high_rsi:.1f} (Перекуплена)."
-        else:
-            response += "🛡 Для продажи сигналов нет. HODL (Держи)!"
-            
+        if best_buy and low_rsi < 40: response += f"🚀 **Покупать:** {best_buy} (RSI {low_rsi:.1f}).\n\n"
+        else: response += "📉 Для покупки дорого.\n\n"
+        if best_sell and high_rsi > 60: response += f"💰 **Продавать:** {best_sell} (RSI {high_rsi:.1f})."
+        else: response += "🛡 Продавать рано."
         bot.send_message(uid, response, parse_mode="Markdown")
         return
 
-    # 2. РАЗГОВОРНАЯ ЧАСТЬ (БОЛТАЛКА)
-    if "привет" in text or "салам" in text or "здравствуй" in text:
-        answers = ["Салам! Готов делать деньги?", "Приветствую! Смотрим графики?", "Привет! Я на связи 24/7."]
-        bot.send_message(uid, random.choice(answers))
-        return
-        
-    if "как дела" in text or "как жизнь" in text:
-        bot.send_message(uid, "У меня всё стабильно, как курс USDT. А у тебя как? Профит есть?")
-        return
-        
-    if "погода" in text:
-        bot.send_message(uid, "Я облачный бот, у меня всегда облачно ☁️. Но если серьезно — посмотри в окно, я же графики анализирую, а не метеорологию!")
-        return
-        
-    if "кто ты" in text or "что ты" in text:
-        bot.send_message(uid, "Я — твой карманный финансовый аналитик. Умею считать арбитраж, следить за ценами и давать советы. И я никогда не сплю.")
-        return
-        
-    if "как пользоваться" in text or "помоги" in text:
-        bot.send_message(uid, "Всё просто:\n1. Нажми 'Назад в меню'.\n2. 'Калькулятор' чтобы посчитать обмен.\n3. 'Мой список' чтобы следить за криптой.\nЕсли что — спрашивай!")
-        return
-
-    # 3. ЕСЛИ НЕ ПОНЯЛ
-    bot.send_message(uid, "Слушай, я не ChatGPT, я финансовый бот. Спроси меня 'Что купить', 'Как дела' или просто нажми кнопки.", parse_mode="Markdown")
-
+    if "привет" in text: bot.send_message(uid, random.choice(["Салам!", "Привет!"])); return
+    if "как дела" in text: bot.send_message(uid, "Все супер. А у тебя?"); return
+    if "погода" in text: bot.send_message(uid, "Я в облаке, тут сухо. Посмотри в окно ☔️"); return
+    
+    bot.send_message(uid, "Спроси меня про рынок или нажми кнопки.")
 
 # =======================
-# ФУНКЦИИ БОТА (КАЛЬКУЛЯТОРЫ И ТД)
+# ФУНКЦИОНАЛ
 # =======================
 @bot.message_handler(func=lambda message: message.text == "🧮 Калькулятор")
 def calc(message):
@@ -374,6 +337,9 @@ def tr_6(message):
             log_action(message.chat.id, message.from_user.username, "Тройной обмен")
     except: pass
 
+# =======================
+# ГРАФИКИ (ПОЛНОЕ МЕНЮ)
+# =======================
 @bot.message_handler(func=lambda message: message.text == "📈 Графики")
 def chart(message):
     if message.chat.id in banned_users: return
@@ -384,23 +350,39 @@ def chart(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('ch_'))
 def ch_2(call):
     get_user_data(call.message)['chart_cur'] = call.data.replace('ch_', '')
-    m = types.InlineKeyboardMarkup()
-    m.add(types.InlineKeyboardButton("30 дней", callback_data="tm_30d"), types.InlineKeyboardButton("1 день", callback_data="tm_1d"))
-    bot.edit_message_text("Период:", call.message.chat.id, call.message.message_id, reply_markup=m)
+    m = types.InlineKeyboardMarkup(row_width=2)
+    m.add(
+        types.InlineKeyboardButton("30 Дней", callback_data="tm_30d"), types.InlineKeyboardButton("15 Дней", callback_data="tm_15d"),
+        types.InlineKeyboardButton("7 Дней", callback_data="tm_7d"), types.InlineKeyboardButton("3 Дня", callback_data="tm_3d"),
+        types.InlineKeyboardButton("1 День", callback_data="tm_1d"), types.InlineKeyboardButton("12 Часов", callback_data="tm_12h"),
+        types.InlineKeyboardButton("6 Часов", callback_data="tm_6h"), types.InlineKeyboardButton("3 Часа", callback_data="tm_3h")
+    )
+    bot.edit_message_text("Выберите период:", call.message.chat.id, call.message.message_id, reply_markup=m)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('tm_'))
 def ch_3(call):
     tm = call.data.replace('tm_', '')
     t = get_user_data(call.message)['chart_cur']
     bot.answer_callback_query(call.id, "Рисую...")
-    p, i = ('1mo', '1d') if tm == '30d' else ('1d', '30m')
+    
+    # Логика периодов
+    period, interval = '1mo', '1d'
+    if tm == '15d': period, interval = '1mo', '1d'
+    elif tm == '7d': period, interval = '5d', '60m'
+    elif tm == '3d': period, interval = '5d', '60m'
+    elif tm == '1d': period, interval = '1d', '30m'
+    elif tm == '12h': period, interval = '1d', '15m'
+    elif tm == '6h': period, interval = '1d', '5m'
+    elif tm == '3h': period, interval = '1d', '5m'
+
     try:
-        d = yf.Ticker(t).history(period=p, interval=i)
+        d = yf.Ticker(t).history(period=period, interval=interval)
         if not d.empty:
             plt.figure(figsize=(10,5))
-            plt.plot(d.index, d['Close'])
+            plt.plot(d.index, d['Close'], label=t)
             plt.title(f"{t} ({tm})")
             plt.grid(True)
+            plt.legend()
             buf = io.BytesIO()
             plt.savefig(buf, format='png')
             buf.seek(0)
