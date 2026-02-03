@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 
 # --- КОНФИГУРАЦИЯ ---
-BOT_TOKEN = 'ВСТАВЬ_СЮДА_СВОЙ_ТОКЕН' 
+BOT_TOKEN = '8212929038:AAFdctXociA1FcnaxKW7N0wbfc6SdFbJ1v0' 
 bot = telebot.TeleBot(BOT_TOKEN)
 
 TICKERS = {
@@ -95,3 +95,4 @@ def triple_step_3(call):
     bot.edit_message_text(f"Цепь: ...-> {t} ->...\n3️⃣ Конец:", uid, call.message.message_id, reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: 
+
