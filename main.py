@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 
 # --- КОНФИГУРАЦИЯ ---
-BOT_TOKEN = 'ВСТАВЬ_СЮДА_СВОЙ_ТОКЕН' 
+BOT_TOKEN = '8212929038:AAFdctXociA1FcnaxKW7N0wbfc6SdFbJ1v0' 
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Словарь тикеров (Yahoo Finance формат)
@@ -518,4 +518,5 @@ print("Бот запущен...")
 if __name__ == '__main__':
 
     bot.infinity_polling()
+
 
