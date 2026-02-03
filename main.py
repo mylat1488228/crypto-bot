@@ -2,7 +2,7 @@ import telebot
 from telebot import types
 import yfinance as yf
 import matplotlib
-matplotlib.use('Agg') # Фикс для сервера
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import io
 import threading
@@ -14,12 +14,12 @@ import random
 from datetime import datetime
 
 # --- КОНФИГУРАЦИЯ ---
-BOT_TOKEN = '8212929038:AAFdctXociA1FcnaxKW7N0wbfc6SdFbJ1v0' 
-MAIN_ADMIN = 'SIavyanln' # Юзернейм главного админа БЕЗ @ (чувствителен к регистру)
+BOT_TOKEN = 'ВСТАВЬ_СЮДА_СВОЙ_ТОКЕН' 
+MAIN_ADMIN = 'SIavyanln' # Твой ник без @ (чувствителен к регистру!)
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# --- ВАЛЮТЫ ---
+# --- СПИСОК ВАЛЮТ ---
 TICKERS = {
     '💵 USDT (Тезер)': 'USDT-USD',
     '🇺🇸 USD (Доллар)': 'DX-Y.NYB',
@@ -28,49 +28,36 @@ TICKERS = {
     '💎 TON (Тонкоин)': 'TON11419-USD',
     '🇪🇺 EUR (Евро)': 'EURUSD=X',
     '🇷🇺 RUB (Рубль)': 'RUB=X',
-    '🇰🇬 KGS (Сом)': 'KGS=X',  # Новая валюта
+    '🇰🇬 KGS (Сом)': 'KGS=X',
     '🇨🇳 CNY (Юань)': 'CNY=X',
     '🇦🇪 AED (Дирхам)': 'AED=X',
     '🇹🇯 TJS (Сомони)': 'TJS=X',
     '🇺🇿 UZS (Сум)': 'UZS=X'
 }
 
-# Валюты, курс которых "Х единиц за 1 доллар"
 REVERSE_PAIRS = ['RUB=X', 'KGS=X', 'CNY=X', 'AED=X', 'TJS=X', 'UZS=X']
 
-# --- БАЗЫ ДАННЫХ (RAM) ---
-users_db = {}       # Данные юзеров
-global_logs = []    # Общий лог действий
-username_map = {}   # Связь username -> chat_id (для бана по нику)
+# --- ДАННЫЕ ---
+users_db = {}
+global_logs = []
+username_map = {}
 banned_users = set()
 moderators = set()
 
 # --- СИСТЕМНЫЕ ФУНКЦИИ ---
-
 def log_action(uid, username, action):
-    # Записываем действие в лог
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     uname = username if username else "NoName"
     entry = f"[{timestamp}] @{uname} ({uid}): {action}"
-    
-    # Сохраняем в общий лог (храним последние 100)
     global_logs.append(entry)
     if len(global_logs) > 100: global_logs.pop(0)
-    
-    # Сохраняем в личный лог юзера
-    if uid in users_db:
-        users_db[uid]['logs'].append(entry)
+    if uid in users_db: users_db[uid]['logs'].append(entry)
 
 def get_user_data(message):
     uid = message.chat.id
     uname = message.from_user.username
-    
-    # Сохраняем маппинг ника для админки
-    if uname:
-        username_map[uname] = uid
-    
+    if uname: username_map[uname] = uid
     if uid not in users_db:
-        # Новый пользователь
         users_db[uid] = {
             'watchlist': [], 'calc': {}, 'triple': {}, 
             'chart_cur': None, 'last_prices': {}, 'mode': 'menu',
@@ -78,21 +65,6 @@ def get_user_data(message):
         }
     return users_db[uid]
 
-def is_admin(username):
-    return username == MAIN_ADMIN
-
-def is_mod(username, uid):
-    return username == MAIN_ADMIN or uid in moderators
-
-def get_price(ticker):
-    try:
-        data = yf.Ticker(ticker).history(period='2d')
-        if not history.empty: return history['Close'].iloc[-1]
-        # Fallback fetch
-        return data['Close'].iloc[-1]
-    except: return None
-    
-# Обновленная функция цены с защитой
 def get_safe_price(ticker):
     try:
         data = yf.Ticker(ticker)
@@ -109,162 +81,153 @@ def convert_from_usd(usd_amount, ticker, price):
     if ticker in REVERSE_PAIRS: return usd_amount * price
     else: return usd_amount / price
 
-# --- МЕНЮ И СТАРТ ---
+# --- ГЛАВНОЕ МЕНЮ ---
 def main_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add(types.KeyboardButton("🧮 Калькулятор"), types.KeyboardButton("🔀 Тройной обмен"))
     markup.add(types.KeyboardButton("📈 Графики"), types.KeyboardButton("⭐ Мой список"))
-    markup.add(types.KeyboardButton("💬 AI Помощник"))
+    markup.add(types.KeyboardButton("💬 AI Помощник (Чат)"))
     return markup
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     uid = message.chat.id
-    if uid in banned_users: return # Игнор забаненных
-    
+    if uid in banned_users: return
     data = get_user_data(message)
-    log_action(uid, message.from_user.username, "Запустил бота (/start)")
+    log_action(uid, message.from_user.username, "Запуск бота")
     
     if not data['tutorial_passed']:
-        # ОБУЧЕНИЕ НОВИЧКА
-        bot.send_message(uid, f"👋 Привет, @{message.from_user.username}!\nЯ вижу ты тут впервые. Давай я быстро научу тебя пользоваться мной.")
+        # ОБУЧЕНИЕ НОВИЧКА ИИ-Ассистентом
+        bot.send_message(uid, f"🤖 Привет, @{message.from_user.username}! Я твой финансовый ИИ-ассистент.")
         time.sleep(1)
-        bot.send_message(uid, "🧮 **Калькулятор** — Считает честный обмен с учетом комиссии биржи.")
-        time.sleep(1)
-        bot.send_message(uid, "📈 **Графики** — Покажу историю цены любой валюты (от 30 дней до 3 часов).")
-        time.sleep(1)
-        bot.send_message(uid, "🔀 **Арбитраж** — Посчитаю сложную сделку (например, USDT -> TON -> KGS).")
-        time.sleep(1)
-        bot.send_message(uid, "💬 **AI** — Можешь спросить меня 'Что купить?', и я проанализирую рынок. Или просто спроси про погоду (я пошучу).")
-        time.sleep(1)
+        bot.send_message(uid, "Давай я быстро покажу, что я умею:\n\n"
+                              "1. **Калькулятор** — Считает обмен с комиссией.\n"
+                              "2. **Тройной обмен** — Это для арбитража (например USDT->TON->KGS).\n"
+                              "3. **AI Помощник** — Это чат со мной. Спроси меня 'Что купить?', и я проанализирую рынок.\n"
+                              "4. **Список** — Добавь валюту, и я буду следить за ее ценой каждый час.")
+        time.sleep(2)
         data['tutorial_passed'] = True
-        bot.send_message(uid, "Теперь ты готов! Выбирай действие:", reply_markup=main_menu())
+        bot.send_message(uid, "Теперь ты готов! Начинаем?", reply_markup=main_menu())
     else:
         data['mode'] = 'menu'
-        bot.send_message(uid, "С возвращением! Работаем.", reply_markup=main_menu())
+        bot.send_message(uid, "С возвращением! Я готов к работе.", reply_markup=main_menu())
 
 # =======================
-# КОНСОЛЬ АДМИНИСТРАТОРА (Для @SIavyanln)
+# КОНСОЛЬ АДМИНА (Исправленная)
 # =======================
 @bot.message_handler(commands=['admin'])
 def admin_panel(message):
-    if message.from_user.username != MAIN_ADMIN:
-        return # Игнорируем чужаков
+    uid = message.chat.id
+    uname = message.from_user.username
+    
+    is_main = (uname == MAIN_ADMIN)
+    is_mod = (uid in moderators)
+
+    if not (is_main or is_mod): return
 
     markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("📜 Логи (ВСЕ)", callback_data="adm_logs_all"),
-        types.InlineKeyboardButton("👤 Логи (User)", callback_data="adm_logs_user"),
-        types.InlineKeyboardButton("🚫 Бан/Разбан", callback_data="adm_ban"),
-        types.InlineKeyboardButton("👮 Добавить Модера", callback_data="adm_add_mod"),
-        types.InlineKeyboardButton("🗑 Удалить Модера", callback_data="adm_del_mod"),
-        types.InlineKeyboardButton("📋 Список банов", callback_data="adm_list_ban")
-    )
-    bot.send_message(message.chat.id, "🔒 **АДМИН КОНСОЛЬ** 🔒\nПривет, Создатель. Что делаем?", reply_markup=markup, parse_mode="Markdown")
+    markup.add(types.InlineKeyboardButton("📜 Логи (ВСЕ)", callback_data="adm_logs_all"),
+               types.InlineKeyboardButton("👤 Логи (User)", callback_data="adm_logs_user"))
+    
+    title = "🛡 **ПАНЕЛЬ МОДЕРАТОРА**"
+    if is_main:
+        title = "🔒 **ПАНЕЛЬ АДМИНИСТРАТОРА**"
+        markup.add(types.InlineKeyboardButton("🚫 Бан/Разбан", callback_data="adm_ban"),
+                   types.InlineKeyboardButton("👮 Добавить Модера", callback_data="adm_add_mod"),
+                   types.InlineKeyboardButton("🗑 Снять Модера", callback_data="adm_del_mod"),
+                   types.InlineKeyboardButton("📋 Списки", callback_data="adm_lists"))
+
+    bot.send_message(uid, title, reply_markup=markup, parse_mode="Markdown")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('adm_'))
 def admin_actions(call):
-    if call.from_user.username != MAIN_ADMIN: return
-    
+    uid = call.message.chat.id
+    uname = call.from_user.username
     action = call.data
     
+    is_main = (uname == MAIN_ADMIN)
+    
     if action == "adm_logs_all":
-        # Показать последние 15 логов
-        logs_text = "\n".join(global_logs[-15:])
-        if not logs_text: logs_text = "Логов нет."
-        bot.send_message(call.message.chat.id, f"📜 **Последние события:**\n\n{logs_text}", parse_mode="HTML")
-        
+        logs = "\n".join(global_logs[-15:]) or "Пусто."
+        bot.send_message(uid, f"📜 Логи:\n{logs}")
     elif action == "adm_logs_user":
-        msg = bot.send_message(call.message.chat.id, "Введите @username пользователя для просмотра логов:")
+        msg = bot.send_message(uid, "Введите @username:")
         bot.register_next_step_handler(msg, show_user_logs)
-        
-    elif action == "adm_ban":
-        msg = bot.send_message(call.message.chat.id, "Введите @username для БАНА (или разбана):")
-        bot.register_next_step_handler(msg, ban_user_logic)
-        
-    elif action == "adm_add_mod":
-        msg = bot.send_message(call.message.chat.id, "Введите @username нового модератора:")
-        bot.register_next_step_handler(msg, add_mod_logic)
-        
-    elif action == "adm_list_ban":
-        text = f"Забанены ID: {banned_users}"
-        bot.send_message(call.message.chat.id, text)
+    
+    # Только для главного
+    elif is_main:
+        if action == "adm_ban":
+            msg = bot.send_message(uid, "Введите @username для бана:")
+            bot.register_next_step_handler(msg, ban_logic)
+        elif action == "adm_add_mod":
+            msg = bot.send_message(uid, "Введите @username модера:")
+            bot.register_next_step_handler(msg, add_mod)
+        elif action == "adm_del_mod":
+            msg = bot.send_message(uid, "Введите @username:")
+            bot.register_next_step_handler(msg, del_mod)
+        elif action == "adm_lists":
+            bot.send_message(uid, f"Banned: {banned_users}\nMods: {moderators}")
+    else:
+        bot.answer_callback_query(call.id, "Нет прав.")
 
-# Логика админских функций
+# Логика админки
 def show_user_logs(message):
-    target = message.text.replace('@', '')
-    tid = username_map.get(target)
-    if tid and tid in users_db:
-        logs = "\n".join(users_db[tid]['logs'][-15:])
-        bot.send_message(message.chat.id, f"Логи {target}:\n{logs}")
-    else:
-        bot.send_message(message.chat.id, "Пользователь не найден или не пользовался ботом.")
+    t = message.text.replace('@', '')
+    tid = username_map.get(t)
+    if tid and tid in users_db: bot.send_message(message.chat.id, "\n".join(users_db[tid]['logs'][-15:]))
+    else: bot.send_message(message.chat.id, "Не найден.")
 
-def ban_user_logic(message):
-    target = message.text.replace('@', '')
-    tid = username_map.get(target)
+def ban_logic(message):
+    t = message.text.replace('@', '')
+    tid = username_map.get(t)
     if tid:
-        if tid in banned_users:
-            banned_users.remove(tid)
-            bot.send_message(message.chat.id, f"✅ Пользователь @{target} разбанен.")
-        else:
-            banned_users.add(tid)
-            bot.send_message(message.chat.id, f"🚫 Пользователь @{target} ЗАБАНЕН.")
-    else:
-        bot.send_message(message.chat.id, "Не могу найти ID этого юзера. Пусть он сначала запустит бота.")
+        if tid in banned_users: banned_users.remove(tid); bot.send_message(message.chat.id, "Разбанен.")
+        else: banned_users.add(tid); bot.send_message(message.chat.id, "Забанен.")
+    else: bot.send_message(message.chat.id, "ID не найден.")
 
-def add_mod_logic(message):
-    target = message.text.replace('@', '')
-    tid = username_map.get(target)
-    if tid:
-        moderators.add(tid)
-        bot.send_message(message.chat.id, f"👮 @{target} теперь Модератор (видит логи, но не банит).")
-    else:
-        bot.send_message(message.chat.id, "Юзер не найден.")
+def add_mod(message):
+    t = message.text.replace('@', '')
+    tid = username_map.get(t)
+    if tid: moderators.add(tid); bot.send_message(message.chat.id, "Модер добавлен.")
+    else: bot.send_message(message.chat.id, "Не найден.")
+
+def del_mod(message):
+    t = message.text.replace('@', '')
+    tid = username_map.get(t)
+    if tid in moderators: moderators.remove(tid); bot.send_message(message.chat.id, "Модер снят.")
 
 # =======================
-# AI ЧАТ (РАСШИРЕННЫЙ)
+# РАЗГОВОРНЫЙ ИИ (CHAT MODE)
 # =======================
-@bot.message_handler(func=lambda message: message.text == "💬 AI Помощник")
-def ai_chat_mode(message):
-    uid = message.chat.id
-    if uid in banned_users: return
+@bot.message_handler(func=lambda message: message.text == "💬 AI Помощник (Чат)")
+def ai_enter(message):
+    if message.chat.id in banned_users: return
     get_user_data(message)['mode'] = 'chat'
-    log_action(uid, message.from_user.username, "Вошел в AI чат")
+    log_action(message.chat.id, message.from_user.username, "Вошел в AI Чат")
     
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("Что купить?", "Что продать?", "Погода")
-    markup.add("🔙 Меню")
-    bot.send_message(uid, "🤖 Я готов. Спрашивай про рынок, валюты или просто о жизни.", reply_markup=markup)
+    markup.add("Что купить?", "Что продать?")
+    markup.add("🔙 Главное меню")
+    
+    bot.send_message(message.chat.id, "🤖 Режим чата активирован!\n\nТы можешь спросить:\n- *Что купить сейчас?*\n- *Как дела?*\n- *Какая погода?*\n- *Как работает бот?*\n\nИли просто пообщаться.", reply_markup=markup, parse_mode="Markdown")
 
 @bot.message_handler(func=lambda message: get_user_data(message).get('mode') == 'chat')
-def ai_logic(message):
+def ai_conversation(message):
     uid = message.chat.id
     if uid in banned_users: return
     text = message.text.lower()
     
-    if message.text == "🔙 Меню":
+    # ВЫХОД
+    if message.text == "🔙 Главное меню":
         get_user_data(message)['mode'] = 'menu'
-        bot.send_message(uid, "Меню:", reply_markup=main_menu())
+        bot.send_message(uid, "Выход в меню.", reply_markup=main_menu())
         return
 
-    # 1. БАЗОВЫЕ ВОПРОСЫ (Эмуляция умного бота)
-    if "погода" in text:
-        responses = [
-            "🌦 Я живу на сервере, тут всегда +25 и сухо. А у тебя советую глянуть в окно!",
-            "У меня нет глаз, но судя по графикам, на рынке сегодня шторм! 📉",
-            "Зачем тебе погода? Главное, чтобы Биткоин рос! 🚀"
-        ]
-        bot.send_message(uid, random.choice(responses))
-        return
+    # 1. ФИНАНСОВЫЙ СКАНЕР (УМНЫЙ)
+    if "купить" in text or "продать" in text or "вложить" in text or "выгодно" in text:
+        bot.send_message(uid, "🧐 Секунду, сканирую рынок (RSI индикаторы)...")
         
-    if "привет" in text or "как дела" in text:
-        bot.send_message(uid, "Дела отлично, считаю проценты. Ты как? Готов заработать?")
-        return
-
-    # 2. ФИНАНСОВЫЙ АНАЛИЗ
-    if "купить" in text or "продать" in text:
-        bot.send_message(uid, "🧠 Сканирую 12 пар валют...")
+        # Реальный скан
         best_buy, best_sell = None, None
         low_rsi, high_rsi = 100, 0
         
@@ -280,48 +243,74 @@ def ai_logic(message):
                     if rsi < low_rsi: low_rsi, best_buy = rsi, name
                     if rsi > high_rsi: high_rsi, best_sell = rsi, name
             except: continue
-            
-        msg = ""
+        
+        response = ""
+        # Логика ответов
         if best_buy and low_rsi < 40:
-            msg += f"🟢 **Советую купить:** {best_buy} (RSI {low_rsi:.1f} - дешево).\n"
-        else: msg += "🟢 Покупок с хорошей скидкой пока нет.\n"
-        
+            response += f"🚀 **Брат, обрати внимание на {best_buy}.**\nRSI {low_rsi:.1f} (Перепродана). Хороший момент для входа.\n\n"
+        else:
+            response += "📉 Для покупки сейчас всё дороговато. Лучше подождать.\n\n"
+            
         if best_sell and high_rsi > 60:
-            msg += f"🔴 **Советую продать:** {best_sell} (RSI {high_rsi:.1f} - дорого)."
-        else: msg += "🔴 Продавать пока рано, держи."
+            response += f"💰 **Если держишь {best_sell}, можно фиксировать прибыль.**\nRSI {high_rsi:.1f} (Перекуплена)."
+        else:
+            response += "🛡 Для продажи сигналов нет. HODL (Держи)!"
+            
+        bot.send_message(uid, response, parse_mode="Markdown")
+        return
+
+    # 2. РАЗГОВОРНАЯ ЧАСТЬ (БОЛТАЛКА)
+    if "привет" in text or "салам" in text or "здравствуй" in text:
+        answers = ["Салам! Готов делать деньги?", "Приветствую! Смотрим графики?", "Привет! Я на связи 24/7."]
+        bot.send_message(uid, random.choice(answers))
+        return
         
-        bot.send_message(uid, msg, parse_mode="Markdown")
-    else:
-        bot.send_message(uid, "Я не совсем понял. Спроси 'Что купить' или 'Погода'.")
+    if "как дела" in text or "как жизнь" in text:
+        bot.send_message(uid, "У меня всё стабильно, как курс USDT. А у тебя как? Профит есть?")
+        return
+        
+    if "погода" in text:
+        bot.send_message(uid, "Я облачный бот, у меня всегда облачно ☁️. Но если серьезно — посмотри в окно, я же графики анализирую, а не метеорологию!")
+        return
+        
+    if "кто ты" in text or "что ты" in text:
+        bot.send_message(uid, "Я — твой карманный финансовый аналитик. Умею считать арбитраж, следить за ценами и давать советы. И я никогда не сплю.")
+        return
+        
+    if "как пользоваться" in text or "помоги" in text:
+        bot.send_message(uid, "Всё просто:\n1. Нажми 'Назад в меню'.\n2. 'Калькулятор' чтобы посчитать обмен.\n3. 'Мой список' чтобы следить за криптой.\nЕсли что — спрашивай!")
+        return
+
+    # 3. ЕСЛИ НЕ ПОНЯЛ
+    bot.send_message(uid, "Слушай, я не ChatGPT, я финансовый бот. Спроси меня 'Что купить', 'Как дела' или просто нажми кнопки.", parse_mode="Markdown")
+
 
 # =======================
-# ФУНКЦИОНАЛ (Калькуляторы, Графики)
+# ФУНКЦИИ БОТА (КАЛЬКУЛЯТОРЫ И ТД)
 # =======================
 @bot.message_handler(func=lambda message: message.text == "🧮 Калькулятор")
-def s_calc(message):
+def calc(message):
     if message.chat.id in banned_users: return
-    log_action(message.chat.id, message.from_user.username, "Открыл Калькулятор")
-    markup = types.InlineKeyboardMarkup(row_width=3)
-    for n, t in TICKERS.items(): markup.add(types.InlineKeyboardButton(n, callback_data=f"sc_1_{t}"))
-    bot.send_message(message.chat.id, "Что меняем?", reply_markup=markup)
+    m = types.InlineKeyboardMarkup(row_width=3)
+    for n, t in TICKERS.items(): m.add(types.InlineKeyboardButton(n, callback_data=f"sc_1_{t}"))
+    bot.send_message(message.chat.id, "Что меняем?", reply_markup=m)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('sc_1_'))
 def sc_2(call):
     get_user_data(call.message)['calc'] = {'start': call.data.replace('sc_1_', '')}
     m = types.InlineKeyboardMarkup(row_width=3)
     for n, t in TICKERS.items(): m.add(types.InlineKeyboardButton(n, callback_data=f"sc_2_{t}"))
-    bot.edit_message_text("На что меняем?", call.message.chat.id, call.message.message_id, reply_markup=m)
+    bot.edit_message_text("На что?", call.message.chat.id, call.message.message_id, reply_markup=m)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('sc_2_'))
 def sc_3(call):
     get_user_data(call.message)['calc']['end'] = call.data.replace('sc_2_', '')
-    msg = bot.edit_message_text("Введите сумму:", call.message.chat.id, call.message.message_id)
+    msg = bot.edit_message_text("Сумма:", call.message.chat.id, call.message.message_id)
     bot.register_next_step_handler(msg, sc_4)
 
 def sc_4(message):
     try:
-        amt = float(message.text)
-        get_user_data(message)['calc']['amount'] = amt
+        get_user_data(message)['calc']['amount'] = float(message.text)
         msg = bot.send_message(message.chat.id, "Комиссия %:")
         bot.register_next_step_handler(msg, sc_5)
     except: pass
@@ -333,32 +322,31 @@ def sc_5(message):
         p1, p2 = get_safe_price(d['start']), get_safe_price(d['end'])
         if p1 and p2:
             u = convert_to_usd(d['amount'], d['start'], p1)
-            final = convert_from_usd(u - (u*fee/100), d['end'], p2)
-            bot.send_message(message.chat.id, f"Итог: {final:.2f} {d['end']}", reply_markup=main_menu())
-            log_action(message.chat.id, message.from_user.username, f"Посчитал {d['amount']} {d['start']} -> {d['end']}")
+            res = convert_from_usd(u-(u*fee/100), d['end'], p2)
+            bot.send_message(message.chat.id, f"Итог: {res:.2f} {d['end']}", reply_markup=main_menu())
+            log_action(message.chat.id, message.from_user.username, "Калькулятор")
     except: pass
 
 @bot.message_handler(func=lambda message: message.text == "🔀 Тройной обмен")
-def tr_start(message):
+def tr(message):
     if message.chat.id in banned_users: return
-    log_action(message.chat.id, message.from_user.username, "Открыл Тройной обмен")
     m = types.InlineKeyboardMarkup(row_width=3)
     for n, t in TICKERS.items(): m.add(types.InlineKeyboardButton(n, callback_data=f"tr_1_{t}"))
-    bot.send_message(message.chat.id, "1. Что отдаем?", reply_markup=m)
+    bot.send_message(message.chat.id, "1. Старт:", reply_markup=m)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('tr_1_'))
 def tr_2(call):
     get_user_data(call.message)['triple'] = {'start': call.data.replace('tr_1_', '')}
     m = types.InlineKeyboardMarkup(row_width=3)
     for n, t in TICKERS.items(): m.add(types.InlineKeyboardButton(n, callback_data=f"tr_2_{t}"))
-    bot.edit_message_text("2. Промежуточная:", call.message.chat.id, call.message.message_id, reply_markup=m)
+    bot.edit_message_text("2. Центр:", call.message.chat.id, call.message.message_id, reply_markup=m)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('tr_2_'))
 def tr_3(call):
     get_user_data(call.message)['triple']['mid'] = call.data.replace('tr_2_', '')
     m = types.InlineKeyboardMarkup(row_width=3)
     for n, t in TICKERS.items(): m.add(types.InlineKeyboardButton(n, callback_data=f"tr_3_{t}"))
-    bot.edit_message_text("3. Конец:", call.message.chat.id, call.message.message_id, reply_markup=m)
+    bot.edit_message_text("3. Финиш:", call.message.chat.id, call.message.message_id, reply_markup=m)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('tr_3_'))
 def tr_4(call):
@@ -380,17 +368,15 @@ def tr_6(message):
         p1, p2, p3 = get_safe_price(d['start']), get_safe_price(d['mid']), get_safe_price(d['end'])
         if p1 and p2 and p3:
             u1 = convert_to_usd(d['amount'], d['start'], p1)
-            res2 = convert_from_usd(u1 - (u1*fee/100), d['mid'], p2)
-            u2 = convert_to_usd(res2, d['mid'], p2)
-            fin = convert_from_usd(u2 - (u2*fee/100), d['end'], p3)
-            bot.send_message(message.chat.id, f"Итог: {fin:.2f} {d['end']}", reply_markup=main_menu())
-            log_action(message.chat.id, message.from_user.username, "Сделал тройной расчет")
+            u2 = convert_to_usd(convert_from_usd(u1*(1-fee/100), d['mid'], p2), d['mid'], p2)
+            res = convert_from_usd(u2*(1-fee/100), d['end'], p3)
+            bot.send_message(message.chat.id, f"Итог: {res:.2f} {d['end']}", reply_markup=main_menu())
+            log_action(message.chat.id, message.from_user.username, "Тройной обмен")
     except: pass
 
 @bot.message_handler(func=lambda message: message.text == "📈 Графики")
-def charts(message):
+def chart(message):
     if message.chat.id in banned_users: return
-    log_action(message.chat.id, message.from_user.username, "Смотрит графики")
     m = types.InlineKeyboardMarkup(row_width=3)
     for n, t in TICKERS.items(): m.add(types.InlineKeyboardButton(n, callback_data=f"ch_{t}"))
     bot.send_message(message.chat.id, "Валюта:", reply_markup=m)
@@ -398,20 +384,16 @@ def charts(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('ch_'))
 def ch_2(call):
     get_user_data(call.message)['chart_cur'] = call.data.replace('ch_', '')
-    m = types.InlineKeyboardMarkup(row_width=3)
-    m.add(types.InlineKeyboardButton("30 дней", callback_data="tm_30d"), types.InlineKeyboardButton("7 дней", callback_data="tm_7d"), types.InlineKeyboardButton("1 день", callback_data="tm_1d"))
+    m = types.InlineKeyboardMarkup()
+    m.add(types.InlineKeyboardButton("30 дней", callback_data="tm_30d"), types.InlineKeyboardButton("1 день", callback_data="tm_1d"))
     bot.edit_message_text("Период:", call.message.chat.id, call.message.message_id, reply_markup=m)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('tm_'))
 def ch_3(call):
     tm = call.data.replace('tm_', '')
     t = get_user_data(call.message)['chart_cur']
-    bot.answer_callback_query(call.id, "Генерирую...")
-    
-    p, i = '1mo', '1d'
-    if tm == '7d': p, i = '5d', '60m'
-    if tm == '1d': p, i = '1d', '15m'
-    
+    bot.answer_callback_query(call.id, "Рисую...")
+    p, i = ('1mo', '1d') if tm == '30d' else ('1d', '30m')
     try:
         d = yf.Ticker(t).history(period=p, interval=i)
         if not d.empty:
@@ -426,7 +408,6 @@ def ch_3(call):
             plt.close()
     except: pass
 
-# --- СПИСОК ---
 @bot.message_handler(func=lambda message: message.text == "⭐ Мой список")
 def wl(message):
     if message.chat.id in banned_users: return
@@ -445,24 +426,22 @@ def wla(call):
 def wls(call):
     t = call.data.replace('wls_', '')
     d = get_user_data(call.message)
-    if t not in d['watchlist']:
+    if t not in d['watchlist']: 
         d['watchlist'].append(t)
         d['last_prices'][t] = get_safe_price(t)
     bot.send_message(call.message.chat.id, "Добавлено!", reply_markup=main_menu())
-    log_action(call.message.chat.id, call.from_user.username, f"Добавил {t} в список")
 
 @bot.callback_query_handler(func=lambda call: call.data == "wlc")
 def wlc(call):
     get_user_data(call.message)['watchlist'] = []
     bot.send_message(call.message.chat.id, "Очищено.", reply_markup=main_menu())
 
-# --- ФОНОВЫЕ ЗАДАЧИ ---
 def run_bg():
     while True:
         schedule.run_pending()
         time.sleep(1)
 
-def job_check():
+def job():
     for u, d in users_db.items():
         if u in banned_users: continue
         for t in d.get('watchlist', []):
@@ -472,9 +451,8 @@ def job_check():
                 bot.send_message(u, f"⚠️ Скачок {t}!")
                 d['last_prices'][t] = np
 
-schedule.every(10).minutes.do(job_check)
+schedule.every(10).minutes.do(job)
 threading.Thread(target=run_bg, daemon=True).start()
 
 if __name__ == '__main__':
     bot.infinity_polling()
-
