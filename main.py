@@ -14,7 +14,7 @@ import random
 from datetime import datetime
 
 # --- КОНФИГУРАЦИЯ ---
-BOT_TOKEN = '8212929038:AAFdctXociA1FcnaxKW7N0wbfc6SdFbJ1v0'
+BOT_TOKEN = '8212929038:AAEJ_P_Ttiy8-nrf1W2KfOqxQDiJNY1MlGk'
 MAIN_ADMIN = 'SIavyanln' 
 
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -438,4 +438,5 @@ threading.Thread(target=run_bg, daemon=True).start()
 
 if __name__ == '__main__':
     bot.infinity_polling()
+
 
