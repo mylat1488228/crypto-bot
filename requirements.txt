@@ -1,7 +1,6 @@
-pyTelegramBotAPI
-yfinance
-matplotlib
-schedule
+aiogram>=3.0.0
+aiosqlite
 pandas
-numpy
-requests
+matplotlib
+yfinance
+python-dotenv
