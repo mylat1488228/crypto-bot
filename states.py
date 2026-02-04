@@ -9,12 +9,17 @@ class ProjectState(StatesGroup):
 class ReportState(StatesGroup):
     select_project = State()
     turnover = State()
-    cost_materials = State()
-    cost_commissions = State()
-    cost_payouts = State()
-    cost_ads = State()
-    cost_services = State()
-    confirm = State()
+    expenses = State() # Упростим ввод расходов до одной суммы для теста, или используй полную цепочку
 
 class CalcState(StatesGroup):
-    waiting_for_input = State()
+    select_currency_1 = State()
+    select_currency_2 = State()
+    amount = State()
+    fee = State()
+
+class TripleCalcState(StatesGroup):
+    curr_1 = State()
+    curr_2 = State()
+    curr_3 = State()
+    amount = State()
+    fee = State()
