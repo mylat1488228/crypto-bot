@@ -4,3 +4,4 @@ matplotlib
 schedule
 pandas
 numpy
+requests
