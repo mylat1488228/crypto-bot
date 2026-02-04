@@ -2,7 +2,7 @@ import os
 
 # Токен и Админ
 BOT_TOKEN = os.getenv('BOT_TOKEN', '8212929038:AAEJ_P_Ttiy8-nrf1W2KfOqxQDiJNY1MlGk')
-MAIN_ADMIN_USERNAME = 'SIavyanln'
+MAIN_ADMIN_USERNAME = 'Slavyanln'
 
 # Полный список валют для калькуляторов и графиков
 TICKERS = {
